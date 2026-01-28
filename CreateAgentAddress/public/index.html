@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentAddress Generator - Universal Identity for AI Agents</title>
+  <style>
+    :root {
+      --bg: #0f1624;
+      --card: #121c2f;
+      --accent: #4ade80;
+      --accent-dim: rgba(74,222,128,0.12);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #f87171;
+      --warning: #fbbf24;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    body { margin:0; background: radial-gradient(circle at 20% 20%, #1f2a44, #0b1020 55%); color: var(--text); min-height: 100vh; display:flex; align-items:center; justify-content:center; padding: 24px; }
+    .panel { background: var(--card); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 32px; max-width: 720px; width:100%; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+    h1 { margin-top:0; font-size: 28px; letter-spacing: 0.3px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+    .robot-icon { font-size: 32px; }
+    .tagline { color: var(--accent); font-size: 14px; font-weight: 500; margin-bottom: 20px; }
+    p { color: var(--muted); line-height: 1.6; margin: 0 0 12px 0; }
+    .intro { margin-bottom: 24px; }
+    .intro p { font-size: 15px; }
+    .highlight { color: var(--text); font-weight: 500; }
+    button { background: linear-gradient(135deg, #4ade80, #2dd4bf); color:#0b1020; border:none; border-radius:12px; padding:14px 28px; font-weight:700; font-size: 15px; cursor:pointer; transition: transform .08s ease, box-shadow .08s ease; }
+    button:hover { box-shadow: 0 8px 24px rgba(74,222,128,0.25); }
+    button:active { transform: translateY(1px) scale(.99); }
+    .error { color: var(--danger); margin-top:12px; font-size: 14px; }
+
+    /* Result card styles */
+    #result-container { display: none; margin-top: 24px; }
+    #result-container.visible { display: block; }
+    .result-card { background: #0b1324; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .result-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .result-header h3 { margin: 0; font-size: 16px; color: var(--accent); }
+    .check-icon { width: 20px; height: 20px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .check-icon::after { content: ''; width: 6px; height: 10px; border: solid #0b1020; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px); }
+
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    .field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 6px; }
+    .field-value { font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 13px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; word-break: break-all; position: relative; cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s; }
+    .field-value:hover { border-color: rgba(74,222,128,0.3); }
+    .field-value.secret { color: var(--warning); }
+    .copy-hint { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); opacity: 0; transition: opacity 0.15s; }
+    .field-value:hover .copy-hint { opacity: 1; }
+    .copied { color: var(--accent) !important; }
+
+    .warning-box { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.25); border-radius: 8px; padding: 12px 14px; margin-top: 16px; }
+    .warning-box p { color: var(--warning); font-size: 13px; margin: 0; }
+
+    /* Chain badges */
+    .chains-section { margin-top: 24px; }
+    .chains-header { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 12px; }
+    .chains-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chain-badge { display: inline-block; padding: 5px 10px; border-radius: 6px; background: var(--accent-dim); color: var(--accent); font-size: 11px; font-weight: 500; }
+    .chain-badge.mainnet { background: rgba(74,222,128,0.15); }
+    .chain-badge.testnet { background: rgba(147,51,234,0.15); color: #a78bfa; }
+
+    /* Initial state */
+    #initial-state { text-align: center; padding: 32px 20px; background: #0b1324; border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; margin-top: 24px; }
+    #initial-state p { font-size: 14px; margin: 0; }
+    #initial-state.hidden { display: none; }
+
+    @media(max-width:640px){
+      .panel { padding: 24px 20px; }
+      .field-value { font-size: 11px; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1><span class="robot-icon">&#129302;</span> AgentAddress Generator</h1>
+    <div class="tagline">Universal identity for AI agents on the internet</div>
+
+    <div class="intro">
+      <p>An <span class="highlight">Agent Address</span> is like a Social Security Number for your AI agent. It provides a <span class="highlight">unique, verifiable identity</span> that works across any website accepting AgentAddress authentication.</p>
+      <p>Use it with <span class="highlight">AgentPMT's AgentAddressAuth</span> tool for seamless authentication and cryptographic signatures. Your agent proves its identity without ever revealing the secret key.</p>
+    </div>
+
+    <button id="generate">Generate New Agent Address</button>
+    <div id="error" class="error"></div>
+
+    <div id="initial-state">
+      <p>Click the button above to generate your agent's unique identity</p>
+    </div>
+
+    <div id="result-container" aria-live="polite">
+      <div class="result-card">
+        <div class="result-header">
+          <div class="check-icon"></div>
+          <h3>Agent Address Generated</h3>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Agent Address (public - share this)</div>
+          <div class="field-value" id="address" onclick="copyField(this)">
+            <span class="copy-hint">click to copy</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Agent Secret Key (never share)</div>
+          <div class="field-value secret" id="privateKey" onclick="copyField(this)">
+            <span class="copy-hint">click to copy</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Recovery Phrase (never share - write down safely)</div>
+          <div class="field-value secret" id="mnemonic" onclick="copyField(this)">
+            <span class="copy-hint">click to copy</span>
+          </div>
+        </div>
+
+        <div class="warning-box">
+          <p>Save your secret key and recovery phrase securely. We don't store anything - if you lose these, your agent's identity is gone forever.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="chains-section">
+      <div class="chains-header">Works on all EVM-compatible chains</div>
+      <div class="chains-grid" id="chains-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    const chains = [
+      { name: 'Ethereum', testnet: false },
+      { name: 'Base', testnet: false },
+      { name: 'Arbitrum', testnet: false },
+      { name: 'Optimism', testnet: false },
+      { name: 'Polygon', testnet: false },
+      { name: 'BNB Chain', testnet: false },
+      { name: 'Avalanche', testnet: false },
+      { name: 'zkSync', testnet: false },
+      { name: 'Linea', testnet: false },
+      { name: 'Scroll', testnet: false },
+      { name: 'Blast', testnet: false },
+      { name: 'Mantle', testnet: false },
+      { name: 'Fantom', testnet: false },
+      { name: 'Gnosis', testnet: false },
+      { name: 'Cronos', testnet: false },
+      { name: 'Celo', testnet: false },
+      { name: 'Moonbeam', testnet: false },
+      { name: 'Harmony', testnet: false },
+      { name: 'Zora', testnet: false },
+      { name: 'Metis', testnet: false },
+      { name: 'Aurora', testnet: false },
+      { name: 'Taiko', testnet: false },
+      { name: 'Sei', testnet: false },
+      { name: 'Sepolia', testnet: true },
+      { name: 'Holesky', testnet: true },
+      { name: 'Base Sepolia', testnet: true },
+      { name: 'Arbitrum Sepolia', testnet: true },
+      { name: 'OP Sepolia', testnet: true },
+      { name: '+30 more', testnet: false },
+    ];
+
+    // Render chain badges
+    const chainsGrid = document.getElementById('chains-grid');
+    chains.forEach(chain => {
+      const badge = document.createElement('span');
+      badge.className = `chain-badge ${chain.testnet ? 'testnet' : 'mainnet'}`;
+      badge.textContent = chain.name;
+      chainsGrid.appendChild(badge);
+    });
+
+    const btn = document.getElementById('generate');
+    const errBox = document.getElementById('error');
+    const initialState = document.getElementById('initial-state');
+    const resultContainer = document.getElementById('result-container');
+    const addressEl = document.getElementById('address');
+    const privateKeyEl = document.getElementById('privateKey');
+    const mnemonicEl = document.getElementById('mnemonic');
+
+    function copyField(el) {
+      const text = el.getAttribute('data-value');
+      navigator.clipboard.writeText(text).then(() => {
+        const hint = el.querySelector('.copy-hint');
+        hint.textContent = 'copied!';
+        hint.classList.add('copied');
+        setTimeout(() => {
+          hint.textContent = 'click to copy';
+          hint.classList.remove('copied');
+        }, 1500);
+      });
+    }
+
+    btn.addEventListener('click', async () => {
+      errBox.textContent = '';
+      btn.textContent = 'Generating...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/generate');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+
+        // Update fields
+        addressEl.childNodes[0].textContent = json.evmAddress;
+        addressEl.setAttribute('data-value', json.evmAddress);
+
+        privateKeyEl.childNodes[0].textContent = json.evmPrivateKey;
+        privateKeyEl.setAttribute('data-value', json.evmPrivateKey);
+
+        mnemonicEl.childNodes[0].textContent = json.mnemonic;
+        mnemonicEl.setAttribute('data-value', json.mnemonic);
+
+        // Show result
+        initialState.classList.add('hidden');
+        resultContainer.classList.add('visible');
+
+      } catch (e) {
+        errBox.textContent = e.message;
+      } finally {
+        btn.textContent = 'Generate New Agent Address';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

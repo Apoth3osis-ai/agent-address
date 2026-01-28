@@ -1,0 +1,42 @@
+// EVM chains share the same address derived from secp256k1 key (m/44'/60'/0'/0/index)
+// Add/remove networks as needed; names are cosmetic for display.
+module.exports = {
+  evmChains: [
+    'Ethereum Mainnet',
+    'Base Mainnet',
+    'Base Sepolia Testnet',
+    'Arbitrum One',
+    'Arbitrum Sepolia',
+    'Optimism Mainnet',
+    'OP Sepolia',
+    'Polygon PoS',
+    'Polygon Amoy Testnet',
+    'BNB Smart Chain',
+    'Avalanche C-Chain',
+    'Fantom Opera',
+    'Gnosis Chain (xDai)',
+    'zkSync Era',
+    'Linea',
+    'Scroll',
+    'Mantle',
+    'Blast',
+    'Cronos',
+    'Celo',
+    'Harmony One',
+    'Moonriver',
+    'Moonbeam',
+    'Klaytn',
+    'Zora',
+    'Metis',
+    'Aurora',
+    'OKX Chain',
+    'Evmos',
+    'Telos EVM',
+    'Sei EVM',
+    'Taiko',
+    'Berachain bArtio Testnet',
+    "Artio/'Art' Testnet (Berachain)",
+    'Holesky (Ethereum testnet)',
+    'Sepolia (Ethereum testnet)'
+  ]
+};

@@ -1,0 +1,33 @@
+{
+  "name": "agent-address",
+  "version": "1.0.0",
+  "description": "CLI + web UI to generate EVM wallet (BIP-39 -> secp256k1).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/generate.js",
+    "start:ui": "node src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Apoth3osis-ai/agent-address.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Apoth3osis-ai/agent-address/issues"
+  },
+  "homepage": "https://github.com/Apoth3osis-ai/agent-address#readme",
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "@noble/secp256k1": "^3.0.0",
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1",
+    "bs58": "^6.0.0",
+    "ed25519-hd-key": "^1.3.0",
+    "express": "^5.2.1",
+    "tweetnacl": "^1.0.3"
+  }
+}

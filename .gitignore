@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+*.egg
+.eggs/
+
+# Environment & Secrets
+.env
+.env.*
+*.local
+.secrets
+*.key
+*.pem
+mnemonic.txt
+private_key.txt
+
+# IDE & Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-*
+
+# OS Files
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs & Debug
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build & Dist
+dist/
+build/
+*.egg-info/
+.cache/
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+.nyc_output/
+
+# Misc
+*.bak
+*.tmp
+*.temp
+.scratch/
