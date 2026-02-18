@@ -1,171 +1,161 @@
-# 🔑 SignAgentAddressAuth
+﻿# SignAgentAddressAuth
 
-**Authenticate with your AgentAddress in one command.**
+AgentPMT external signer CLI for buying credits and using them with wallet signatures.
 
-A simple CLI tool that handles the full authentication flow: fetches a challenge, signs it with your secret key, and verifies your identity.
+This tool matches AgentPMT's current external flow:
+- Buy credits with `x402` (`/api/external/credits/purchase`)
+- Create session nonce (`/api/external/auth/session`)
+- Sign balance requests (`/api/external/credits/balance`)
+- Sign invoke requests (`/api/external/tools/{productId}/invoke`)
+- One-command invoke flow (`session -> sign -> POST invoke`)
 
----
-
-## Quick Start
+## Install
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Authenticate (make sure AcceptAgentAddress server is running)
-python sign.py --server http://localhost:8000 --address 0xYourAddress --key 0xYourSecretKey
 ```
 
----
-
-## Usage
-
-### Command Line Arguments
+## Environment variables
 
 ```bash
-python sign.py --server http://localhost:8000 --address 0x... --key 0x...
+export AGENT_ADDRESS=0xYourWallet
+export AGENT_KEY=0xYourPrivateKey
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--server`, `-s` | Server URL (default: `http://localhost:8000`) |
-| `--address`, `-a` | Your AgentAddress |
-| `--key`, `-k` | Your secret key |
-| `--verbose`, `-v` | Show detailed output |
-| `--quiet`, `-q` | Minimal output for scripting |
-| `--interactive`, `-i` | Prompt for credentials |
+You can also pass `--address` and `--key` on each command.
 
-### Environment Variables
+## Commands
+
+### 1) Buy credits with x402 (generate `PAYMENT-SIGNATURE`)
 
 ```bash
-export AGENT_ADDRESS=0xYourAddress
-export AGENT_KEY=0xYourSecretKey
-
-python sign.py --server http://localhost:8000
+python sign.py purchase-x402 \
+  --server https://www.agentpmt.com \
+  --address 0xYOUR_WALLET \
+  --key 0xYOUR_PRIVATE_KEY \
+  --credits 500
 ```
 
-### Interactive Mode
+This command:
+1. Calls `POST /api/external/credits/purchase` with `payment_method: "x402"`
+2. Reads the `PAYMENT-REQUIRED` header from the `402` response
+3. Signs EIP-3009 `TransferWithAuthorization`
+4. Prints JSON containing:
+- `payment_signature_header` for the request header
+- `next_request` with ready-to-send headers and body
+
+To generate and submit in one command:
 
 ```bash
-python sign.py --server http://localhost:8000 --interactive
-# Prompts for address and key (key input is hidden)
+python sign.py purchase-x402 \
+  --server https://www.agentpmt.com \
+  --address 0xYOUR_WALLET \
+  --key 0xYOUR_PRIVATE_KEY \
+  --credits 500 \
+  --submit
 ```
 
----
+### 2) Create a session nonce
 
-## Examples
-
-**Basic authentication:**
 ```bash
-python sign.py -s http://localhost:8000 -a 0x742d35Cc6634C0532925a3b844Bc9e7595f... -k 0x...
+python sign.py session \
+  --server https://www.agentpmt.com \
+  --address 0xYOUR_WALLET
 ```
 
-**Verbose output (see the full flow):**
+### 3) Sign a balance request
+
 ```bash
-python sign.py -v -s http://localhost:8000 -a 0x... -k 0x...
+python sign.py sign-balance \
+  --address 0xYOUR_WALLET \
+  --key 0xYOUR_PRIVATE_KEY \
+  --session-nonce <session_nonce>
 ```
 
-Output:
-```
-🤖 AgentAddress Authentication
+Output includes:
+- `message`
+- `signature`
+- `request_body` (ready for `POST /api/external/credits/balance`)
 
-Requesting challenge from http://localhost:8000/challenge...
-Received challenge (expires in 300s)
-Nonce: a1b2c3d4e5f6...
+### 4) Sign an invoke request
 
-Payload to sign:
-AgentAddress Authentication
-
-Address: 0x742d35cc6634c0532925a3b844bc9e7595f...
-Nonce: a1b2c3d4e5f67890...
-Timestamp: 1706300000
-
-Signing payload with secret key...
-Signature: 0x1a2b3c4d5e6f7890...90abcdef
-
-Submitting signature to http://localhost:8000/verify...
-✓ Authentication successful!
-  Address: 0x742d35Cc6634C0532925a3b844Bc9e7595f...
-```
-
-**Scripting mode:**
 ```bash
-if python sign.py -q -s http://localhost:8000 -a 0x... -k 0x...; then
-  echo "Agent authenticated!"
-else
-  echo "Authentication failed"
-fi
+python sign.py sign-invoke \
+  --address 0xYOUR_WALLET \
+  --key 0xYOUR_PRIVATE_KEY \
+  --session-nonce <session_nonce> \
+  --product-id <product_id> \
+  --parameters-json '{"action":"get_instructions"}'
 ```
 
----
+Alternative:
 
-## Exit Codes
+```bash
+python sign.py sign-invoke \
+  --address 0xYOUR_WALLET \
+  --key 0xYOUR_PRIVATE_KEY \
+  --session-nonce <session_nonce> \
+  --product-id <product_id> \
+  --parameters-file ./params.json
+```
 
-| Code | Meaning |
-|------|---------|
-| `0` | Authentication successful |
-| `1` | Authentication failed or invalid input |
-| `2` | Connection error |
-| `130` | Cancelled (Ctrl+C) |
+Output includes:
+- `payload_hash`
+- `message`
+- `signature`
+- `request_body` (ready for `POST /api/external/tools/{productId}/invoke`)
 
----
+### 5) One-command invoke (create session -> sign invoke -> POST invoke)
 
-## Use as a Library
+```bash
+python sign.py invoke-e2e \
+  --server https://www.agentpmt.com \
+  --address 0xYOUR_WALLET \
+  --key 0xYOUR_PRIVATE_KEY \
+  --product-id <product_id> \
+  --parameters-json '{"action":"get_instructions"}'
+```
+
+Output includes:
+- `session`
+- `signed_invoke`
+- `invoke_result`
+
+## Exact message formats used by AgentPMT
+
+### Balance signature message
+
+```text
+agentpmt-external
+wallet:<lowercase_wallet>
+session:<session_nonce>
+request:<request_id>
+action:balance
+product:-
+payload:
+```
+
+### Invoke signature message
+
+```text
+agentpmt-external
+wallet:<lowercase_wallet>
+session:<session_nonce>
+request:<request_id>
+action:invoke
+product:<product_id>
+payload:<sha256(canonical_json(parameters))>
+```
+
+`canonical_json(parameters)` is exactly:
 
 ```python
-from sign import authenticate
-
-result = authenticate(
-    server_url="http://localhost:8000",
-    address="0x742d35Cc6634C0532925a3b844Bc9e7595f...",
-    private_key="0x...",
-    verbose=True,
-)
-
-if result["verified"]:
-    print(f"Authenticated as {result['address']}")
+json.dumps(parameters, sort_keys=True, separators=(",", ":"))
 ```
 
----
+## Notes
 
-## Full Flow
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                     SignAgentAddressAuth                         │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. Load credentials (args, env vars, or interactive prompt)     │
-│                              │                                   │
-│                              ▼                                   │
-│  2. POST /challenge ─────────────────────► AcceptAgentAddress    │
-│                              │                                   │
-│                              ▼                                   │
-│  3. Receive payload + nonce                                      │
-│                              │                                   │
-│                              ▼                                   │
-│  4. Sign payload with secret key (locally)                       │
-│                              │                                   │
-│                              ▼                                   │
-│  5. POST /verify ────────────────────────► AcceptAgentAddress    │
-│                              │                                   │
-│                              ▼                                   │
-│  6. Output result: ✓ verified  or  ✗ failed                     │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Security
-
-- Your secret key is **never sent to the server**
-- Only the signature (proof you have the key) is transmitted
-- Each authentication uses a unique nonce (no replay attacks)
-- Use `--interactive` to avoid putting your key in shell history
-
----
-
-## License
-
-MIT
+- Wallet address is normalized to lowercase before signing.
+- `request_id` should be unique per request.
+- For `purchase-x402`, default authorization validity is 30 minutes (`--validity-seconds`).
+- Private keys stay local; only signatures are sent to AgentPMT.

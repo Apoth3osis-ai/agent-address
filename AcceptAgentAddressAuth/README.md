@@ -1,170 +1,126 @@
-# 🔐 AcceptAgentAddress
+﻿# AcceptAgentAddressAuth
 
-**Verify AgentAddress signatures for authentication.**
+Reference FastAPI verifier for AgentPMT external wallet signature flows.
 
-A FastAPI server that lets you authenticate AI agents (or users) by verifying they control an AgentAddress. Uses cryptographic signatures with replay protection.
+This server implements the verification side for:
+- session nonce creation
+- signed balance checks
+- signed tool invocations
+- sponsored credit purchases
+- x402 payment header verification
 
----
-
-## How It Works
-
-```
-┌─────────────┐     1. Request challenge 
-                            (sends address)   ┌─────────────────────┐
-│             │ ─────────────────────────────► │                     │
-│   Agent     │                                 │  AcceptAgentAddress │
-│             │ ◄───────────────────────────── │       Server        │
-│             │     2. Receive payload + nonce │                     │
-│             │                                │                     │
-│             │     3. Sign payload            │                     │
-│             │        (with secret key)       │                     │
-│             │                                │                     │
-│             │     4. Submit signature        │                     │
-│             │ ─────────────────────────────► │                     │
-│             │                                │                     │
-│             │ ◄───────────────────────────── │                     │
-└─────────────┘     5. Verified or rejected    └─────────────────────┘
-```
-
-1. Agent requests a challenge by submitting their AgentAddress
-2. Server returns a payload containing a unique nonce
-3. Agent signs the payload with their secret key
-4. Agent submits the signature back to the server
-5. Server verifies the signature matches the address
-
-**Replay Protection:** Each nonce can only be used once. Challenges expire after 5 minutes.
-
----
-
-## Quick Start
+## Quick start
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the server
 python main.py
 ```
 
-Server runs at `http://localhost:8000`
+Server: `http://localhost:8000`
 
-API docs available at `http://localhost:8000/docs`
+OpenAPI docs: `http://localhost:8000/docs`
 
----
+## Endpoints
 
-## API Endpoints
+### `POST /session`
+Creates a session nonce for one wallet.
 
-### `POST /challenge`
-
-Request a challenge payload to sign.
-
-**Request:**
+Request:
 ```json
 {
-  "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f..."
+  "wallet_address": "0xabc..."
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
-  "nonce": "a1b2c3d4e5f6...",
-  "payload": "AgentAddress Authentication\n\nAddress: 0x742d...\nNonce: a1b2c3d4e5f6...\nTimestamp: 1706300000",
-  "expires_in": 300
+  "session_nonce": "2d6c7d3f-...",
+  "expires_in": 900,
+  "expires_at": "2026-02-16T00:00:00Z"
 }
 ```
 
-### `POST /verify`
+### `POST /verify/balance`
+Verifies the AgentPMT balance-signature message format.
 
-Verify a signed challenge.
-
-**Request:**
+Request:
 ```json
 {
-  "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f...",
-  "nonce": "a1b2c3d4e5f6...",
+  "wallet_address": "0xabc...",
+  "session_nonce": "2d6c7d3f-...",
+  "request_id": "balance-123",
   "signature": "0x..."
 }
 ```
 
-**Response (success):**
+### `POST /verify/invoke`
+Verifies the AgentPMT invoke-signature message format.
+
+Request:
 ```json
 {
-  "verified": true,
-  "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f...",
-  "message": "Signature verified. AgentAddress authenticated successfully."
+  "wallet_address": "0xabc...",
+  "session_nonce": "2d6c7d3f-...",
+  "request_id": "invoke-123",
+  "product_id": "tool_abc",
+  "parameters": {"action": "get_instructions"},
+  "signature": "0x..."
 }
 ```
 
-**Response (failure):**
+### `POST /verify/sponsor`
+Verifies sponsor signature when payer wallet is different from recipient wallet.
+
+Request:
 ```json
 {
-  "verified": false,
-  "address": "0xRecoveredAddress...",
-  "message": "Signature invalid. Recovered address does not match claimed address."
+  "payer_wallet_address": "0xpayer...",
+  "recipient_wallet_address": "0xrecipient...",
+  "credits": 500,
+  "reference_kind": "tx",
+  "reference_value": "0x<tx_hash>",
+  "signature": "0x..."
 }
 ```
+
+### `POST /verify/x402-payment`
+Verifies `PAYMENT-SIGNATURE` header payload (EIP-712 `TransferWithAuthorization`).
+
+Request:
+```json
+{
+  "wallet_address": "0xabc...",
+  "payment_signature_header": "<base64 header value>",
+  "expected_asset_address": "0xUSDC...",
+  "expected_pay_to": "0xCREDIT_WALLET...",
+  "expected_credits": 500,
+  "domain_name": "USDC",
+  "domain_version": "2",
+  "enforce_not_expired": true
+}
+```
+
+Important check:
+- If `expected_credits` is set, verifier enforces:
+- `authorization.value == expected_credits * 10000`
+
+This is the credits-to-USDC base-unit conversion used by AgentPMT (`100 credits = 1 USD`, `USDC has 6 decimals`).
 
 ### `GET /health`
+Basic health check.
 
-Health check endpoint.
+## Security model
 
----
+- Session nonce ownership check (`session_nonce` must belong to wallet)
+- Session expiry enforcement (default 15 minutes)
+- Replay protection for signed balance/invoke (`session_nonce + request_id` uniqueness)
+- Strict address/signature/nonce format validation
+- Typed-data signature recovery for x402 payment payloads
 
-## Example: Signing with Python
+## Production notes
 
-```python
-from eth_account import Account
-from eth_account.messages import encode_defunct
-import requests
-
-# Your AgentAddress credentials
-address = "0x742d35Cc6634C0532925a3b844Bc9e7595f..."
-private_key = "0x..."
-
-# 1. Request a challenge
-resp = requests.post("http://localhost:8000/challenge", json={"address": address})
-challenge = resp.json()
-
-# 2. Sign the payload
-message = encode_defunct(text=challenge["payload"])
-signed = Account.sign_message(message, private_key)
-
-# 3. Verify the signature
-resp = requests.post("http://localhost:8000/verify", json={
-    "address": address,
-    "nonce": challenge["nonce"],
-    "signature": signed.signature.hex(),
-})
-result = resp.json()
-print(f"Verified: {result['verified']}")
-```
-
----
-
-## Security Notes
-
-| Feature | Description |
-|---------|-------------|
-| Nonce | Each challenge has a unique nonce that can only be used once |
-| Expiry | Challenges expire after 5 minutes |
-| Replay Protection | Used nonces are tracked and rejected |
-| No Storage | Private keys never touch the server |
-
-**Production Considerations:**
-- Use Redis or a database for nonce storage (in-memory won't survive restarts)
-- Add rate limiting to prevent abuse
-- Use HTTPS in production
-- Consider adding additional claims to the payload (e.g., intended action, resource)
-
----
-
-## Integration with AgentPMT
-
-This server implements the verification side of AgentAddress authentication. Use it alongside [AgentPMT's AgentAddressAuth](https://agentpmt.ai) tool to authenticate agents across your services.
-
----
-
-## License
-
-MIT
+- Replace in-memory stores with Redis or database
+- Add rate limiting
+- Run behind HTTPS
+- Add observability and request logging
